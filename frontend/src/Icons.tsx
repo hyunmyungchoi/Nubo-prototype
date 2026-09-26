@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react'
 
 const paths = {
+  menu: 'M4 6h16M4 12h16M4 18h16',
   home: 'M3 10 12 3l9 7M5 9v11h5v-6h4v6h5V9',
   arrow: 'M4 12h16m-6-6 6 6-6 6',
   back: 'M20 12H4m6-6-6 6 6 6',
@@ -28,5 +29,5 @@ export function Icon({ name, size = 20, style, className = '' }: { name: IconNam
   return <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={style}><path d={paths[name]} /></svg>
 }
 export function Logo() {
-  return <span className="brand-mark" aria-hidden="true"><svg viewBox="0 0 36 36" fill="none"><path d="m7 18 11-10 11 10v12H7V18Z" fill="currentColor"/><path d="M15 30v-9h6v9" fill="#f5f7ed"/><path d="M5 17 18 5l13 12" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
+  return <span className="brand-mark" aria-hidden="true"><svg viewBox="0 0 36 36" fill="none"><path d="m7 18 11-10 11 10v12H7V18Z" fill="currentColor"/><path d="M15 30v-9h6v9" fill="#FAFAF7"/><path d="M5 17 18 5l13 12" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
 }
