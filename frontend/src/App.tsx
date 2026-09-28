@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import type { FormEvent } from 'react'
+import type { SubmitEvent } from 'react'
 import { Icon, Logo } from './Icons'
 import { HousingResults } from './HousingResults'
 import { answerLabel, exampleInput, notices, questions } from './demo'
 import type { Answers, DocumentItem, Notice, Step } from './types'
+import { checkBackend, getNotices } from './api'
+import type { NoticeResponse } from './api'
 
 const stages = [
   { key: 'intro', name: '내 상황 입력', caption: '나의 이야기를 들려주세요', icon: 'edit' },
@@ -40,6 +42,53 @@ function downloadSample(notice: Notice, item?: DocumentItem) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
+function formatWon(value: number | null): string {
+  if (value === null) {
+    return '미확인'
+  }
+
+  return `${value.toLocaleString('ko-KR')}원`
+}
+
+function formatDateTime(value: string | null): string {
+  if (value === null) return '미확인'
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '날짜 확인 필요'
+
+  return new Intl.DateTimeFormat('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(date)
+}
+
+function getApplicationStatus(
+  startsAt: string | null,
+  endsAt: string | null,
+  now: number,
+): string {
+  if (startsAt === null || endsAt === null) {
+    return '접수 일정 미확인'
+  }
+
+  const start = new Date(startsAt).getTime()
+  const end = new Date(endsAt).getTime()
+
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start >= end) {
+    return '접수 일정 확인 필요'
+  }
+
+  if (now < start) return '접수 전'
+  if (now >= end) return '접수 마감'
+
+  return '일정상 접수 중'
+}
+
 export default function App() {
   const [step, setStep] = useState<Step>('intro')
   const [input, setInput] = useState('')
@@ -52,6 +101,11 @@ export default function App() {
   const [modal, setModal] = useState<Modal>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [direction, setDirection] = useState<'forward' | 'backward'>('forward')
+  const [apiNotices, setApiNotices] = useState<NoticeResponse[]>([])
+  const [noticesLoading, setNoticesLoading] = useState(true)
+  const [noticesError, setNoticesError] = useState<string | null>(null)
+  const [now, setNow] = useState(() => Date.now())
+
   const menuRef = useRef<HTMLDialogElement>(null)
   const headingRef = useRef<HTMLHeadingElement>(null)
   const dialogRef = useRef<HTMLDialogElement>(null)
@@ -68,20 +122,80 @@ export default function App() {
     if (step !== 'intro') headingRef.current?.focus({ preventScroll: true })
     window.scrollTo({ top: 0, behavior: 'instant' })
   }, [step, questionIndex])
+
   useEffect(() => {
     if (modal && !dialogRef.current?.open) dialogRef.current?.showModal()
     if (!modal && dialogRef.current?.open) dialogRef.current.close()
   }, [modal])
+
   useEffect(() => {
     if (menuOpen && !menuRef.current?.open) menuRef.current?.showModal()
     if (!menuOpen && menuRef.current?.open) menuRef.current.close()
   }, [menuOpen])
+
   useEffect(() => {
     if (!menuOpen && !modal) return
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => { document.body.style.overflow = previousOverflow }
   }, [menuOpen, modal])
+
+  useEffect(() => {
+    checkBackend()
+    .then((data) => {
+      console.log('백엔드 연결 성공:', data)
+    })
+    .catch((error) => {
+      console.error('백엔드 연결 실패:', error)
+    })
+  }, [])
+
+  useEffect(() => {
+    getNotices()
+    .then((notices) => {
+      console.log('받아온 공고 목록:', notices)
+    })
+    .catch((error) => {
+      console.error('공고 조회 오류:', error)
+    })
+  }, [])
+
+  useEffect(() => {
+    let active = true
+    getNotices()
+    .then((notices) => {
+      if (active) {
+        setApiNotices(notices)
+      }
+    })
+    .catch(() => {
+      if (active) {
+        setNoticesError('공고를 불러오지 못했어요.')
+      }
+    })
+    .finally(() => {
+      if (active) {
+        setNoticesLoading(false)
+      }
+    })
+    return () => {
+      active = false
+    }
+  }, [])
+
+  useEffect(() => {
+    function updateNow() {
+      setNow(Date.now())
+    }
+
+    const timer = window.setInterval(updateNow, 1000)
+    window.addEventListener('focus', updateNow)
+
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('focus', updateNow)
+    }
+  }, [])
 
   function reset() {
     setDirection('backward')
@@ -90,7 +204,7 @@ export default function App() {
     setSaved([]); setCheckedDocuments([]); setShowSaved(false); setTypeFilter('all'); setModal(null)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
-  function start(event: FormEvent) {
+  function start(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!input.trim()) return
     setDirection('forward')
@@ -175,6 +289,105 @@ export default function App() {
           <section className="result-heading"><div className="result-summary"><h1 ref={headingRef} tabIndex={-1}>{showSaved ? '관심 공고 한눈에 보기' : '주거지원 한눈에 보기'}</h1><div className="result-profile"><span className="profile-label">내 조건 <small>(예시)</small></span><span>32세</span><span>결혼 예정</span><span>{answers.region === 'seoul' ? '서울' : answers.region === 'gyeonggi' ? '경기' : '서울 / 경기'}</span><span>{answers.money === 'asset' ? '자산 1억 원' : answers.money === 'budget' ? '주거 예산 1억 원' : '금액 의미 미확인'}</span></div></div><button className="outline-button" onClick={() => { setDirection('backward'); setQuestionIndex(0); setStep('confirm') }}><Icon name="edit" size={16} />조건 수정</button></section>
           <div className="result-demo-note"><Icon name="info" size={15} /><p>시연용 가상 공고예요. 실제 자격 / 모집 여부 / 금액은 검증되지 않았어요.</p></div>
           <HousingResults notices={filteredNotices} answers={answers} saved={saved} showSaved={showSaved} typeFilter={typeFilter} checked={checkedDocuments} onShowSaved={setShowSaved} onTypeFilter={setTypeFilter} onToggleSaved={toggleSaved} onToggleDocument={(id) => setCheckedDocuments((items) => items.includes(id) ? items.filter((item) => item !== id) : [...items, id])} onOpenDocument={(notice, item) => setModal({ kind: 'document', item, notice })} onDownloadList={(notice) => downloadSample(notice)} />
+          {import.meta.env.DEV && (
+            <section aria-label="백엔드 공고 연결 확인">
+              <h2>백엔드 공고 연결 확인</h2>
+              <p>개발 확인용 목록이며, 입력 조건에 따른 추천 결과는 아닙니다.</p>
+
+              {noticesLoading && <p role="status">공고를 불러오는 중이에요.</p>}
+
+              {noticesError && <p role="alert">{noticesError}</p>}
+
+              {!noticesLoading && !noticesError && (
+                apiNotices.length === 0 ? (
+                  <p>등록된 공고가 없어요.</p>
+                ) : (
+                  <ul>
+                    {apiNotices.map((notice) => (
+                      <li key={notice.id}>
+                        <strong>{notice.title}</strong>
+                        <p>{notice.agency} / {notice.region}</p>
+                        <p>{notice.reviewed ? '검수 완료' : '검수 전'}</p>
+                        <div>
+                          <p>
+                            <strong>
+                              {getApplicationStatus(
+                                notice.application_starts_at,
+                                notice.application_ends_at,
+                                now,
+                              )}
+                            </strong>
+                          </p>
+
+                          <p>
+                            접수 시작: {formatDateTime(notice.application_starts_at)}
+                          </p>
+                          <p>
+                            접수 마감: {formatDateTime(notice.application_ends_at)}
+                          </p>
+                          <small>
+                            한국시간 / 저장된 일정과 기기 시각 기준입니다.
+                            실제 접수 여부와 변경 사항은 공식 공고에서 확인하세요.
+                          </small>
+                        </div>
+                        {notice.housing_units.length === 0 ? (
+                          <p>등록된 주택 정보가 없어요.</p>
+                        ) : (
+                          <ul>
+                            {notice.housing_units.map((unit) => (
+                              <li key={unit.id}>
+                                <h3>{unit.name}</h3>
+                                <p>{unit.address ?? '주소 미확인'}</p>
+                                <p>
+                                  전용면적: {unit.exclusive_area_m2 === null
+                                    ? '미확인'
+                                    : `${unit.exclusive_area_m2}㎡`}
+                                </p>
+
+                                {unit.rent_options.length === 0 ? (
+                                  <p>임대조건 미확인</p>
+                                ) : (
+                                  <dl>
+                                    {unit.rent_options.map((option, index) => (
+                                      <div key={`${unit.id}-rent-${index}`}>
+                                        <dt>{option.label}</dt>
+                                        <dd>
+                                          <p>보증금: {formatWon(option.deposit_won)}</p>
+                                          <p>월 임대료: {formatWon(option.monthly_rent_won)}</p>
+
+                                          {option.conditions_note && (
+                                            <p>{option.conditions_note}</p>
+                                          )}
+
+                                          {option.source_ref && (
+                                            <details>
+                                              <summary>금액 출처 보기</summary>
+                                              <p>{option.source_ref}</p>
+                                            </details>
+                                          )}
+                                        </dd>
+                                      </div>
+                                    ))}
+                                  </dl>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        <a
+                          href={notice.source_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          공식 공고 보기
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                )
+              )}
+            </section>
+          )}
         </>}
         <footer className="page-footer"><span>© 2026 nubo</span>{step === 'intro' ? <><span className="footer-journey">주거지원 찾기<Icon name="chevron" size={12} />조건 확인<Icon name="chevron" size={12} />신청 준비</span><span>입력 정보는 저장되지 않아요.</span></> : <span>가상 공고로 구성된 화면 시안입니다.</span>}</footer>
       </main>

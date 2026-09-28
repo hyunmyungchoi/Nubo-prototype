@@ -1,0 +1,37 @@
+[
+  {
+    "id": "lh-2015122300020759",
+    "title": "[서울지역본부] 26년 3차 청년 매입임대주택 예비입주자 모집공고",
+    "agency": "LH 서울지역본부",
+    "region": "서울특별시",
+    "source_url": "https://apply.lh.or.kr/lhapply/apply/wt/wrtanc/selectWrtancInfo.do?aisTpCd=26&ccrCnntSysDsCd=03&mi=1026&panId=2015122300020759&uppAisTpCd=13",
+    "published_on": "2026-09-17",
+    "application_starts_at": "2026-09-28T10:00:00+09:00",
+    "application_ends_at": "2026-09-30T16:00:00+09:00",
+    "reviewed": false,
+    "housing_units": [
+      {
+        "id": "lh-2015122300020759-unit-001",
+        "name": "강남개포동(T&K개포) 204호",
+        "address": "서울특별시 강남구 논현로12길 23-5",
+        "exclusive_area_m2": 28.81,
+        "rent_options": [
+          {
+            "label": "청년 1순위 / 기본 임대조건",
+            "deposit_won": 1000000,
+            "monthly_rent_won": 555650,
+            "conditions_note": "1순위 해당 여부는 별도 확인이 필요합니다. 공급주택은 계약 시점에 변경될 수 있습니다.",
+            "source_ref": "26년_3차_청년매입임대_공급주택목록_서울지역본부.xlsx / 청년매입임대 주택목록 / S9:T9"
+          },
+          {
+            "label": "청년 2순위 / 3순위 기본 임대조건",
+            "deposit_won": 2000000,
+            "monthly_rent_won": 682040,
+            "conditions_note": "2순위 또는 3순위 해당 여부는 별도 확인이 필요합니다. 공급주택은 계약 시점에 변경될 수 있습니다.",
+            "source_ref": "26년_3차_청년매입임대_공급주택목록_서울지역본부.xlsx / 청년매입임대 주택목록 / W9:X9"
+          }
+        ]
+      }
+    ]
+  }
+]
